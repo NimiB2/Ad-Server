@@ -14,36 +14,35 @@ events_collection = db['ad_events']
 
 @ad_routes_blueprint.route('/performers', methods=['POST'])
 def create_performer():
-    """
-    Create a new performer
-    ---
-    parameters:
-      - name: performer
-        in: body
-        required: true
-        description: The performer to create
-    schema:
-      id: Performer
-      required:
-        - name
-        - email
-      properties:
-        _id:
-          type: string
-          description: Automatically generated ID
-          readOnly: true
-        name:
-          type: string
-        email:
-          type: string
-    responses:
-      201:
-        description: Performer created successfully
-      400:
-        description: Invalid input
-      500:
-        description: Internal server error
-    """
+  """
+  Create or return an existing performer by email
+  ---
+  parameters:
+    - name: performer
+      in: body
+      required: true
+      description: The performer to create
+      schema:
+        id: Performer
+        required:
+          - name
+          - email
+        properties:
+          name:
+            type: string
+          email:
+            type: string
+  responses:
+    201:
+      description: Performer created successfully
+    200:
+      description: Performer already exists, returned existing ID
+    400:
+      description: Invalid input
+    500:
+      description: Internal server error
+  """
+
     data = request.json
     required_fields = ['name', 'email']
     if not all(field in data for field in required_fields):
@@ -54,6 +53,12 @@ def create_performer():
     if not name or not email:
         return jsonify({'error': 'Name and email cannot be empty'}), 400
 
+    existing = performers_collection.find_one({'email': email})
+    if existing:
+        return jsonify({
+            'message': 'Performer already exists',
+            'performerId': existing['_id']
+        }), 200
     performer = {
         "_id": str(uuid.uuid4()),
         "name": name,
