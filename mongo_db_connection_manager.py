@@ -34,10 +34,8 @@ class MongoConnectionManager:
                 client.admin.command('ping')
                 print("Pinged your deployment. You successfully connected to MongoDB!")
                 MongoConnectionManager.__db = client[DB_NAME]
-                
             except Exception as e:
                 print(e)
-
         return MongoConnectionManager.__db    
 
 
@@ -51,6 +49,5 @@ class MongoConnectionManager:
         """       
         if MongoConnectionManager.__db is None:
             MongoConnectionManager.init_db()
-
         return MongoConnectionManager.__db
 

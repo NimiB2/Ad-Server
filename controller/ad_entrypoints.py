@@ -8,7 +8,65 @@ ad_routes_blueprint = Blueprint('ads', __name__)
 
 db = MongoConnectionManager.get_db()
 ads_collection = db['ads']
+performers_collection = db['performers']
 events_collection = db['ad_events']
+
+
+@ad_routes_blueprint.route('/performers', methods=['POST'])
+def create_performer():
+    """
+    Create a new performer
+    ---
+    parameters:
+      - name: performer
+        in: body
+        required: true
+        description: The performer to create
+    schema:
+      id: Performer
+      required:
+        - name
+        - email
+      properties:
+        _id:
+          type: string
+          description: Automatically generated ID
+          readOnly: true
+        name:
+          type: string
+        email:
+          type: string
+    responses:
+      201:
+        description: Performer created successfully
+      400:
+        description: Invalid input
+      500:
+        description: Internal server error
+    """
+    data = request.json
+    required_fields = ['name', 'email']
+    if not all(field in data for field in required_fields):
+        return jsonify({'error': 'Missing name or email'}), 400
+
+    name = data['name'].strip()
+    email = data['email'].strip()
+    if not name or not email:
+        return jsonify({'error': 'Name and email cannot be empty'}), 400
+
+    performer = {
+        "_id": str(uuid.uuid4()),
+        "name": name,
+        "email": email,
+        "ads": []
+    }
+
+    try:
+        performers_collection.insert_one(performer)
+        return jsonify({'message': 'Performer created', 'performerId': performer['_id']}), 201
+    except Exception as e:
+        return jsonify({'error': 'Failed to create performer'}), 500
+
 
 # Create new ad
 @ad_routes_blueprint.route('/ads', methods=['POST'])
@@ -26,6 +84,7 @@ def create_ad():
           required:
             - adName
             - adDetails
+            - performerId
           properties:
             adName:
               type: string
@@ -46,18 +105,32 @@ def create_ad():
                 exitTime:
                   type: number
                   format: float
+            performerId:
+              type: string
+              description: ID of the performer who owns the ad
+
     responses:
       201:
         description: Ad was created successfully
       400:
         description: Invalid request
+      404:
+        description: Performer not found
+      500:
+        description: Internal server error
+
     """
     ad_data = request.json
     # --- Step 1: Check required top-level fields ---
-    required_fields = ['adName', 'adDetails']
+    required_fields = ['adName','performerId', 'adDetails']
     if not all(field in ad_data for field in required_fields):
         return jsonify({'error': 'Missing required ad fields'}), 400
-
+    
+    performer_id = ad_data['performerId'].strip()
+    performer = performers_collection.find_one({'_id': performer_id})
+    if not performer:
+      return jsonify({'error': 'Performer not found'}), 404
+    
     name = ad_data['adName']
     ad_details = ad_data['adDetails']
 
@@ -104,6 +177,7 @@ def create_ad():
     ad = {
         "_id": str(uuid.uuid4()),
         "name": name.strip(),
+        "performerId": performer_id,
         "adDetails": {
             "videoUrl": video_url,
             "targetUrl": target_url,
@@ -115,10 +189,16 @@ def create_ad():
         "updatedAt": datetime.now(timezone.utc).isoformat()
     }
 
-    ads_collection.insert_one(ad)
+    try:
+        ads_collection.insert_one(ad)
+        performers_collection.update_one(
+          {'_id': performer_id},
+          {'$addToSet': {'ads': ad['_id']}}
+        )
+        return jsonify({'message': 'Ad created successfully', 'adId': ad['_id']}), 201
+    except Exception as e:
+        return jsonify({'error': 'Failed to create ad'}), 500
 
-
-    return jsonify({'message': 'Ad created successfully', 'adId': ad['_id']}), 201
 
 # Get all ads
 @ad_routes_blueprint.route('/ads', methods=['GET'])
@@ -315,6 +395,10 @@ def send_ad_event():
             adId:
               type: string
               description: ID of the ad
+            performerId:
+              type: string
+              description: ID of the performer associated with the ad (set automatically)
+              readOnly: true
             eventDetails:
               type: object
               required:
@@ -345,6 +429,8 @@ def send_ad_event():
         description: The event was logged successfully
       400:
         description: Invalid request
+      500:
+        description: Internal server error
     """
     data = request.json
 
@@ -392,11 +478,20 @@ def send_ad_event():
             return jsonify({'error': 'watchDuration must be non-negative'}), 400
     except (ValueError, TypeError):
         return jsonify({'error': 'Invalid watchDuration format'}), 400
+    
+    ad_doc = ads_collection.find_one({'_id': ad_id})
+    if not ad_doc:
+      return jsonify({'error': 'Ad not found'}), 404
+
+    performer_id = ad_doc.get('performerId')
+    if not performer_id:
+      return jsonify({'error': 'Ad has no performer assigned'}), 500
 
     # Step 8: Build event and insert
     event = {
         "adId": ad_id,
         "appId": app_id,
+        "performerId": performer_id,
         "packageName": package_name,
         "timestamp": timestamp,
         "deviceId": device_id,

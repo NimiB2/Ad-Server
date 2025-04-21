@@ -2,4 +2,3 @@ flask
 flasgger
 pymongo
 python-dotenv
-gunicorn
