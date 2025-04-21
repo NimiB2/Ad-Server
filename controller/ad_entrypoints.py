@@ -11,38 +11,36 @@ ads_collection = db['ads']
 performers_collection = db['performers']
 events_collection = db['ad_events']
 
-
 @ad_routes_blueprint.route('/performers', methods=['POST'])
 def create_performer():
-  """
-  Create or return an existing performer by email
-  ---
-  parameters:
-    - name: performer
-      in: body
-      required: true
-      description: The performer to create
-      schema:
-        id: Performer
-        required:
-          - name
-          - email
-        properties:
-          name:
-            type: string
-          email:
-            type: string
-  responses:
-    201:
-      description: Performer created successfully
-    200:
-      description: Performer already exists, returned existing ID
-    400:
-      description: Invalid input
-    500:
-      description: Internal server error
-  """
-
+    """
+    Create or return an existing performer by email
+    ---
+    parameters:
+      - name: performer
+        in: body
+        required: true
+        description: The performer to create
+        schema:
+          id: Performer
+          required:
+            - name
+            - email
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+    responses:
+      201:
+        description: Performer created successfully
+      200:
+        description: Performer already exists, returned existing ID
+      400:
+        description: Invalid input
+      500:
+        description: Internal server error
+    """
     data = request.json
     required_fields = ['name', 'email']
     if not all(field in data for field in required_fields):
@@ -59,6 +57,7 @@ def create_performer():
             'message': 'Performer already exists',
             'performerId': existing['_id']
         }), 200
+
     performer = {
         "_id": str(uuid.uuid4()),
         "name": name,
@@ -72,12 +71,11 @@ def create_performer():
     except Exception as e:
         return jsonify({'error': 'Failed to create performer'}), 500
 
-
 # Create new ad
 @ad_routes_blueprint.route('/ads', methods=['POST'])
 def create_ad():
     """
-    Create a new ad
+    Create a new ad (using performer email instead of ID)
     ---
     parameters:
       - name: ad
@@ -89,11 +87,14 @@ def create_ad():
           required:
             - adName
             - adDetails
-            - performerId
+            - email
           properties:
             adName:
               type: string
               description: The name of the ad
+            email:
+              type: string
+              description: Email of the performer who owns the ad
             adDetails:
               type: object
               properties:
@@ -110,75 +111,51 @@ def create_ad():
                 exitTime:
                   type: number
                   format: float
-            performerId:
-              type: string
-              description: ID of the performer who owns the ad
-
     responses:
       201:
-        description: Ad was created successfully
+        description: Ad created successfully
       400:
         description: Invalid request
       404:
         description: Performer not found
       500:
         description: Internal server error
-
     """
     ad_data = request.json
-    # --- Step 1: Check required top-level fields ---
-    required_fields = ['adName','performerId', 'adDetails']
+
+    required_fields = ['adName', 'email', 'adDetails']
     if not all(field in ad_data for field in required_fields):
-        return jsonify({'error': 'Missing required ad fields'}), 400
-    
-    performer_id = ad_data['performerId'].strip()
-    performer = performers_collection.find_one({'_id': performer_id})
+        return jsonify({'error': 'Missing required fields (adName, email, adDetails)'}), 400
+
+    email = ad_data['email'].strip()
+    performer = performers_collection.find_one({'email': email})
     if not performer:
-      return jsonify({'error': 'Performer not found'}), 404
-    
+        return jsonify({'error': 'Performer not found'}), 404
+
+    performer_id = performer['_id']
     name = ad_data['adName']
     ad_details = ad_data['adDetails']
 
-    # --- Step 2: Validate types and empty strings for name and packageName ---
-    if not isinstance(name, str) or not name.strip():
-        return jsonify({'error': 'Invalid or empty ad name'}), 400
-
-    # --- Step 3: Validate required adDetails fields ---
+    # Validation for adDetails
     required_details = ['videoUrl', 'targetUrl', 'budget', 'skipTime', 'exitTime']
     if not all(field in ad_details for field in required_details):
-        return jsonify({'error': 'Missing required adDetails fields'}), 400
+        return jsonify({'error': 'Missing adDetails fields'}), 400
 
-    # Extract & normalize fields
-    video_url = ad_details['videoUrl'].strip() if isinstance(ad_details['videoUrl'], str) else ""
-    target_url = ad_details['targetUrl'].strip() if isinstance(ad_details['targetUrl'], str) else ""
-    budget = ad_details['budget'].strip().lower() if isinstance(ad_details['budget'], str) else ""
-    skip_time = ad_details['skipTime']
-    exit_time = ad_details['exitTime']
-
-    # --- Step 4: Validate URL format ---
-    def is_valid_url(url):
-        return url.startswith("http://") or url.startswith("https://")
-
-    if not video_url or not is_valid_url(video_url):
-        return jsonify({'error': 'Invalid videoUrl'}), 400
-    if not target_url or not is_valid_url(target_url):
-        return jsonify({'error': 'Invalid targetUrl'}), 400
-
-    # --- Step 5: Validate budget ---
-    VALID_BUDGETS = {"low", "medium", "high"}
-    if budget not in VALID_BUDGETS:
-        return jsonify({'error': 'Invalid budget level'}), 400
-
-    # --- Step 6: Validate times ---
+    video_url = ad_details['videoUrl'].strip()
+    target_url = ad_details['targetUrl'].strip()
+    budget = ad_details['budget'].strip().lower()
     try:
-        skip_time = float(skip_time)
-        exit_time = float(exit_time)
-        if skip_time < 0 or exit_time <= 0:
-            return jsonify({'error': 'Invalid skipTime or exitTime values'}), 400
+        skip_time = float(ad_details['skipTime'])
+        exit_time = float(ad_details['exitTime'])
     except (ValueError, TypeError):
-        return jsonify({'error': 'skipTime and exitTime must be numbers'}), 400
+        return jsonify({'error': 'Invalid skipTime or exitTime'}), 400
 
-    # --- Step 7: Construct and insert ad ---
+    if not video_url.startswith("http") or not target_url.startswith("http"):
+        return jsonify({'error': 'Invalid URLs'}), 400
+
+    if budget not in {"low", "medium", "high"}:
+        return jsonify({'error': 'Invalid budget'}), 400
+
     ad = {
         "_id": str(uuid.uuid4()),
         "name": name.strip(),
@@ -197,13 +174,12 @@ def create_ad():
     try:
         ads_collection.insert_one(ad)
         performers_collection.update_one(
-          {'_id': performer_id},
-          {'$addToSet': {'ads': ad['_id']}}
+            {'_id': performer_id},
+            {'$addToSet': {'ads': ad['_id']}}
         )
         return jsonify({'message': 'Ad created successfully', 'adId': ad['_id']}), 201
-    except Exception as e:
+    except Exception:
         return jsonify({'error': 'Failed to create ad'}), 500
-
 
 # Get all ads
 @ad_routes_blueprint.route('/ads', methods=['GET'])
