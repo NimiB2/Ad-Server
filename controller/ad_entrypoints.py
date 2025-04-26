@@ -2,6 +2,7 @@ from flask import request, jsonify, Blueprint
 from mongo_db_connection_manager import MongoConnectionManager
 import random
 from datetime import datetime, timezone
+from email_validator import validate_email, EmailNotValidError
 import uuid
 
 ad_routes_blueprint = Blueprint('ads', __name__)
@@ -10,11 +11,26 @@ db = MongoConnectionManager.get_db()
 ads_collection = db['ads']
 performers_collection = db['performers']
 events_collection = db['ad_events']
+daily_stats_collection = db['daily_ad_stats']
+events_by_day_collection = db['events_by_day']
 
+
+# Create index for daily stats
+try:
+    daily_stats_collection.create_index(
+        [("performerId", 1), ("date", 1)],
+        unique=True,
+        name="uniq_performer_date"
+    )
+except Exception as _idx_err:
+    print(f"[Init] daily_performer_stats index skipped/failed: {_idx_err}")
+
+
+# Create performer
 @ad_routes_blueprint.route('/performers', methods=['POST'])
 def create_performer():
     """
-    Create or return an existing performer by email
+    Create a new performer or return existing performer by email
     ---
     parameters:
       - name: performer
@@ -29,17 +45,52 @@ def create_performer():
           properties:
             name:
               type: string
+              description: The performer's name
             email:
               type: string
+              format: email
+              description: The performer's email (must be unique and properly formatted)
+        examples:
+          application/json:
+            {
+              "name": "John Smith",
+              "email": "john.smith@example.com"
+            }
     responses:
       201:
         description: Performer created successfully
+        schema:
+          properties:
+            message:
+              type: string
+              example: "Performer created"
+            performerId:
+              type: string
+              example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
       200:
         description: Performer already exists, returned existing ID
+        schema:
+          properties:
+            message:
+              type: string
+              example: "Performer already exists"
+            performerId:
+              type: string
+              example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
       400:
-        description: Invalid input
+        description: Invalid input or email format
+        schema:
+          properties:
+            error:
+              type: string
+              example: "Invalid email format"
       500:
         description: Internal server error
+        schema:
+          properties:
+            error:
+              type: string
+              example: "Failed to create performer"
     """
     data = request.json
     required_fields = ['name', 'email']
@@ -50,6 +101,17 @@ def create_performer():
     email = data['email'].strip()
     if not name or not email:
         return jsonify({'error': 'Name and email cannot be empty'}), 400
+    
+    try:
+        valid = validate_email(email)
+        email = valid.email 
+    except EmailNotValidError as e:
+        return jsonify({'error': f'Invalid email format: {str(e)}'}), 400
+    except ImportError:
+        import re
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_regex, email):
+            return jsonify({'error': 'Invalid email format'}), 400
 
     existing = performers_collection.find_one({'email': email})
     if existing:
@@ -69,8 +131,8 @@ def create_performer():
         performers_collection.insert_one(performer)
         return jsonify({'message': 'Performer created', 'performerId': performer['_id']}), 201
     except Exception as e:
-        return jsonify({'error': 'Failed to create performer'}), 500
-
+        return jsonify({'error': f'Failed to create performer: {str(e)}'}), 500
+    
 # Create new ad
 @ad_routes_blueprint.route('/ads', methods=['POST'])
 def create_ad():
@@ -87,12 +149,12 @@ def create_ad():
           required:
             - adName
             - adDetails
-            - email
+            - performerEmail
           properties:
             adName:
               type: string
               description: The name of the ad
-            email:
+            performerEmail:
               type: string
               description: Email of the performer who owns the ad
             adDetails:
@@ -111,6 +173,19 @@ def create_ad():
                 exitTime:
                   type: number
                   format: float
+        examples:
+          application/json:
+            {
+              "adName": "My Ad Campaign",
+              "performerEmail": "performer@example.com",
+              "adDetails": {
+                "videoUrl": "https://example.com/video.mp4",
+                "targetUrl": "https://example.com/landing",
+                "budget": "low",
+                "skipTime": 5.0,
+                "exitTime": 30.0
+              }
+            }
     responses:
       201:
         description: Ad created successfully
@@ -123,12 +198,12 @@ def create_ad():
     """
     ad_data = request.json
 
-    required_fields = ['adName', 'email', 'adDetails']
+    required_fields = ['adName', 'performerEmail', 'adDetails']
     if not all(field in ad_data for field in required_fields):
-        return jsonify({'error': 'Missing required fields (adName, email, adDetails)'}), 400
+        return jsonify({'error': 'Missing required fields (adName, performerEmail, adDetails)'}), 400
 
-    email = ad_data['email'].strip()
-    performer = performers_collection.find_one({'email': email})
+    performer_email = ad_data['performerEmail'].strip()
+    performer = performers_collection.find_one({'email': performer_email})
     if not performer:
         return jsonify({'error': 'Performer not found'}), 404
 
@@ -152,7 +227,6 @@ def create_ad():
 
     if not video_url.startswith("http") or not target_url.startswith("http"):
         return jsonify({'error': 'Invalid URLs'}), 400
-
     if budget not in {"low", "medium", "high"}:
         return jsonify({'error': 'Invalid budget'}), 400
 
@@ -160,6 +234,7 @@ def create_ad():
         "_id": str(uuid.uuid4()),
         "name": name.strip(),
         "performerId": performer_id,
+        "performerName": performer["name"],
         "adDetails": {
             "videoUrl": video_url,
             "targetUrl": target_url,
@@ -185,20 +260,20 @@ def create_ad():
 @ad_routes_blueprint.route('/ads', methods=['GET'])
 def get_all_ads():
     """
-Get all ads
----
-responses:
-  200:
-    description: A list of all ads was returned successfully
-  500:
-    description: An error occurred while retrieving ads
+    Get all ads
+    ---
+    responses:
+      200:
+        description: A list of all ads was returned successfully
+      500:
+        description: An error occurred while retrieving ads
     """
     try:
         ads = list(ads_collection.find())
         for ad in ads:
             ad['_id'] = str(ad['_id'])
         return jsonify(ads), 200
-    except Exception as e:
+    except Exception:
         return jsonify({'error': 'Failed to retrieve ads'}), 500
 
 # Get one ad by id
@@ -221,14 +296,13 @@ responses:
   500:
     description: An error occurred while retrieving the ad
     """
-
     try:
         ad = ads_collection.find_one({'_id': ad_id})
         if ad:
             ad['_id'] = str(ad['_id'])
             return jsonify(ad), 200
         return jsonify({'error': 'Ad not found'}), 404
-    except Exception as e:
+    except Exception:
         return jsonify({'error': 'Failed to retrieve ad'}), 500
 
 # Update ad
@@ -259,7 +333,6 @@ responses:
   500:
     description: An error occurred while updating the ad
     """
-
     update_data = request.json
     if not isinstance(update_data, dict):
         return jsonify({'error': 'Invalid update data'}), 400
@@ -278,23 +351,22 @@ responses:
 @ad_routes_blueprint.route('/ads/<ad_id>', methods=['DELETE'])
 def delete_ad(ad_id):
     """
-Delete an ad
----
-parameters:
-  - name: ad_id
-    in: path
-    type: string
-    required: true
-    description: The ID of the ad to delete
-responses:
-  200:
-    description: The ad was deleted successfully
-  404:
-    description: Ad not found
-  500:
-    description: An error occurred while deleting the ad
+    Delete an ad
+    ---
+    parameters:
+      - name: ad_id
+        in: path
+        type: string
+        required: true
+        description: The ID of the ad to delete
+    responses:
+      200:
+        description: The ad was deleted successfully
+      404:
+        description: Ad not found
+      500:
+        description: An error occurred while deleting the ad
     """
-
     try:
         result = ads_collection.delete_one({'_id': ad_id})
         if result.deleted_count:
@@ -303,64 +375,65 @@ responses:
     except Exception:
         return jsonify({'error': 'Failed to delete ad'}), 500
 
-# Get random ad for device (not previously appeared)
+# Get random ad for app
 @ad_routes_blueprint.route('/ads/random', methods=['GET'])
 def get_random_ad():
     """
-Get a random ad for a device
----
-parameters:
-  - name: deviceId
-    in: query
-    type: string
-    required: true
-    description: Unique device identifier
-responses:
-  200:
-    description: A random ad was returned successfully
-  204:
-    description: No ads available
-  400:
-    description: Missing deviceId parameter
-  500:
-    description: An error occurred while retrieving a random ad
+    Get a random ad for an app
+    ---
+    parameters:
+      - name: packageName
+        in: query
+        type: string
+        required: true
+        description: Package name of the app
+    responses:
+      200:
+        description: A random ad was returned successfully
+      204:
+        description: No ads available
+      400:
+        description: Missing packageName parameter
+      500:
+        description: An error occurred while retrieving a random ad
     """
-    device_id = request.args.get('deviceId')
+    package_name = request.args.get('packageName')
 
-    # Step 1: Validate device_id
-    if not isinstance(device_id, str) or not device_id.strip():
-        return jsonify({'error': 'Missing or invalid deviceId'}), 400
-
-    device_id = device_id.strip()
+    if not isinstance(package_name, str) or not package_name.strip():
+        return jsonify({'error': 'Missing or invalid packageName'}), 400
+    package_name = package_name.strip()
 
     try:
-        # Step 2: Get IDs of ads already seen by this device
-        appeared_ad_ids_raw = events_collection.distinct('adId', {'deviceId': device_id})
+        # Find ad IDs that have appeared for this package_name
+        pipeline = [
+            {'$match': {'events.packageName': package_name}},
+            {'$unwind': '$events'},
+            {'$match': {'events.packageName': package_name}},
+            {'$group': {'_id': '$events.adId'}}
+        ]
         
-        appeared_ad_ids = appeared_ad_ids_raw
+        appeared_ad_ids = [doc['_id'] for doc in events_by_day_collection.aggregate(pipeline)]
 
-        # Step 3: Get ads not yet shown
-        unappeared_ads = list(ads_collection.find({'_id': {'$nin': appeared_ad_ids}}))
-
-        # Step 4: Fallback – show any ad if none unappeared
+        unappeared_ads = list(
+            ads_collection.find({'_id': {'$nin': appeared_ad_ids}})
+        )
         if not unappeared_ads:
             unappeared_ads = list(ads_collection.find())
             if not unappeared_ads:
                 return jsonify({'message': 'No ads available'}), 204
 
-        # Step 5: Choose and return random ad
         chosen_ad = random.choice(unappeared_ads)
         chosen_ad['_id'] = str(chosen_ad['_id'])
         return jsonify(chosen_ad), 200
 
     except Exception as e:
-        return jsonify({'error': 'Failed to retrieve random ad'}), 500
-
-# Send ad event (view, click, skip)
+        return jsonify({'error': f'Failed to retrieve random ad: {str(e)}'}), 500
+    
+# Send ad event
 @ad_routes_blueprint.route('/ad_event', methods=['POST'])
 def send_ad_event():
     """
-    Log an ad event (view, click, skip)
+    Log an ad event (view, click, skip, exit)
     ---
     parameters:
       - name: event
@@ -371,219 +444,301 @@ def send_ad_event():
           id: Event
           required:
             - adId
+            - timestamp
             - eventDetails
           properties:
             adId:
               type: string
-              description: ID of the ad
-            performerId:
+            timestamp:
               type: string
-              description: ID of the performer associated with the ad (set automatically)
-              readOnly: true
+              format: date-time
             eventDetails:
               type: object
               required:
-                - appId
                 - packageName
-                - timestamp
-                - deviceId
                 - eventType
                 - watchDuration
               properties:
-                appId:
-                  type: string
                 packageName:
-                  type: string
-                timestamp:
-                  type: string
-                  format: date-time
-                deviceId:
                   type: string
                 eventType:
                   type: string
-                  enum: [view, click, skip]
+                  enum: [view, click, skip, exit]
                 watchDuration:
                   type: number
                   format: float
+    notes:
+      - Each event also updates a daily summary doc in **daily_ad_stats**
+        (write-time counter).
     responses:
       201:
         description: The event was logged successfully
       400:
         description: Invalid request
+      404:
+        description: Ad not found
       500:
         description: Internal server error
     """
     data = request.json
 
-    # Step 1: Validate top-level keys
-    if 'adId' not in data or 'eventDetails' not in data:
-        return jsonify({'error': 'Missing adId or eventDetails'}), 400
+    if 'adId' not in data or 'timestamp' not in data or 'eventDetails' not in data:
+        return jsonify({'error': 'Missing adId, timestamp or eventDetails'}), 400
 
     ad_id = data['adId']
+    timestamp = data['timestamp']
     event_details = data['eventDetails']
 
-    # Step 2: Validate adId format
     if not isinstance(ad_id, str) or not ad_id.strip():
         return jsonify({'error': 'Invalid adId format'}), 400
 
-    # Step 3: Validate eventDetails fields
-    required_fields = ['appId', 'packageName', 'timestamp', 'deviceId', 'eventType', 'watchDuration']
+    required_fields = ['packageName', 'eventType', 'watchDuration']
     if not all(field in event_details for field in required_fields):
         return jsonify({'error': 'Missing eventDetails fields'}), 400
 
-    # Step 4: Extract and normalize fields
-    app_id = event_details['appId'].strip()
     package_name = event_details['packageName'].strip()
-    timestamp = event_details['timestamp'].strip()
-    device_id = event_details['deviceId'].strip()
     event_type = event_details['eventType'].strip().lower()
     watch_duration = event_details['watchDuration']
 
-    # Step 5: Validate string fields are non-empty
     for field_name, value in {
-        'appId': app_id, 'packageName': package_name,
-        'timestamp': timestamp, 'deviceId': device_id, 'eventType': event_type
+        'packageName': package_name,
+        'eventType': event_type,
+        'timestamp': timestamp
     }.items():
         if not isinstance(value, str) or not value:
             return jsonify({'error': f'Invalid or empty field: {field_name}'}), 400
 
-    # Step 6: Validate eventType
-    VALID_TYPES = {'view', 'click', 'skip'}
+    VALID_TYPES = {'view', 'click', 'skip', 'exit'}
     if event_type not in VALID_TYPES:
         return jsonify({'error': 'Invalid eventType'}), 400
 
-    # Step 7: Validate watchDuration
     try:
         watch_duration = float(watch_duration)
         if watch_duration < 0:
             return jsonify({'error': 'watchDuration must be non-negative'}), 400
     except (ValueError, TypeError):
         return jsonify({'error': 'Invalid watchDuration format'}), 400
-    
+
     ad_doc = ads_collection.find_one({'_id': ad_id})
     if not ad_doc:
-      return jsonify({'error': 'Ad not found'}), 404
+        return jsonify({'error': 'Ad not found'}), 404
 
     performer_id = ad_doc.get('performerId')
     if not performer_id:
-      return jsonify({'error': 'Ad has no performer assigned'}), 500
-
-    # Step 8: Build event and insert
-    event = {
-        "adId": ad_id,
-        "appId": app_id,
-        "performerId": performer_id,
-        "packageName": package_name,
-        "timestamp": timestamp,
-        "deviceId": device_id,
-        "eventType": event_type,
-        "watchDuration": watch_duration,
-        "createdAt": datetime.now(timezone.utc).isoformat()
-    }
+        return jsonify({'error': 'Ad has no performer assigned'}), 500
 
     try:
-        events_collection.insert_one(event)
+        # Get today's date
+        today_date = datetime.now(timezone.utc).date().isoformat()
+        
+        # Create the event document
+        event_document = {
+            "adId": ad_id,
+            "performerId": performer_id,
+            "packageName": package_name,
+            "timestamp": timestamp,
+            "eventType": event_type,
+            "watchDuration": watch_duration,
+            "createdAt": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Store in events_by_day collection
+        events_by_day_collection.update_one(
+            {"date": today_date},
+            {"$push": {"events": event_document},
+             "$setOnInsert": {"createdAt": datetime.now(timezone.utc).isoformat()}},
+            upsert=True
+        )
+        
+        # Update daily performer stats
+        stats_key = {
+            "performerId": performer_id,
+            "date": today_date
+        }
+        
+        inc_fields = {f"counts.{event_type}": 1}
+        if event_type == "view":
+            inc_fields["watchDurationSum"] = watch_duration
+        
+        daily_stats_collection.update_one(
+            stats_key,
+            {
+                "$inc": inc_fields,
+                "$setOnInsert": {
+                    "adId": ad_id,
+                    "createdAt": datetime.now(timezone.utc).isoformat()
+                }
+            },
+            upsert=True
+        )
+        
         return jsonify({'message': 'Event logged'}), 201
-    except Exception:
-        return jsonify({'error': 'Failed to store event'}), 500
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to store event: {str(e)}'}), 500
     
 # Get ad statistics by id
 @ad_routes_blueprint.route('/ads/<ad_id>/stats', methods=['GET'])
 def get_ad_statistics(ad_id):
+    
     """
-    Get statistics for an ad
+    Get aggregated statistics for an ad
+
     ---
     parameters:
       - name: ad_id
         in: path
         type: string
         required: true
-        description: The ID of the ad to get statistics for
+        description: ID of the ad whose statistics are requested
+      - name: from
+        in: query
+        type: string
+        required: false
+        format: date
+        description: (Optional) Inclusive start date — ISO-8601 YYYY-MM-DD
+      - name: to
+        in: query
+        type: string
+        required: false
+        format: date
+        description: (Optional) Inclusive end date — ISO-8601 YYYY-MM-DD
     responses:
       200:
-        description: Ad statistics were returned successfully
-        schema:
-          type: object
-          properties:
-            packageName:
-              type: string
-              description: Package name of the application
-            adId:
-              type: string
-              description: The ID of the ad
-            adStats:
-              type: object
-              properties:
-                views:
-                  type: integer
-                  description: Number of views
-                clicks:
-                  type: integer
-                  description: Number of clicks
-                skips:
-                  type: integer
-                  description: Number of skips
-                avgWatchDuration:
-                  type: number
-                  format: float
-                  description: Average watch duration in seconds
-                clickThroughRate:
-                  type: number
-                  format: float
-                  description: Click-through rate percentage
-                conversionRate:
-                  type: number
-                  format: float
-                  description: Conversion rate based on ad budget level
+        description: Statistics calculated from daily roll-ups
       404:
         description: Ad not found
       500:
-        description: An error occurred while retrieving ad statistics
+        description: Server error
+    tags:
+      - Ads
     """
 
+    ad_doc = ads_collection.find_one({'_id': ad_id})
+    if not ad_doc:
+        return jsonify({'error': 'Ad not found'}), 404
 
-    try:
-        # Step 1: Fetch ad
-        ad = ads_collection.find_one({'_id': ad_id})
-        if not ad:
-            return jsonify({'error': 'Ad not found'}), 404
+    match = {'adId': ad_id}
+    date_from = request.args.get('from') 
+    date_to   = request.args.get('to')
 
-        # Step 2: Fetch events
-        view_events = list(events_collection.find({'adId': ad_id, 'eventType': 'view'}))
-        click_events = list(events_collection.find({'adId': ad_id, 'eventType': 'click'}))
-        skip_events = list(events_collection.find({'adId': ad_id, 'eventType': 'skip'}))
+    if date_from or date_to:
+        match['date'] = {}
+        if date_from:
+            match['date']['$gte'] = date_from
+        if date_to:
+            match['date']['$lte'] = date_to
 
-        # Step 3: Compute stats
-        views = len(view_events)
-        clicks = len(click_events)
-        skips = len(skip_events)
-        total_watch_duration = sum(event.get('watchDuration', 0) for event in view_events)
-        avg_watch_duration = total_watch_duration / views if views > 0 else 0
-        ctr = (clicks / views * 100) if views > 0 else 0
+    pipeline = [
+        {'$match': match},
+        {'$group': {
+            '_id': '$adId',
+            'views':  {'$sum': '$counts.view'},
+            'clicks': {'$sum': '$counts.click'},
+            'skips':  {'$sum': '$counts.skip'},
+            'exits':  {'$sum': '$counts.exit'},
+            'watchDurationSum': {'$sum': '$watchDurationSum'}
+        }}
+    ]
 
-        # Step 4: Compute conversion rate
-        BUDGET_LEVELS = {
-            'low': 1,
-            'medium': 2,
-            'high': 3
+    agg = list(daily_stats_collection.aggregate(pipeline))
+    totals = agg[0] if agg else {
+        'views': 0, 'clicks': 0, 'skips': 0, 'exits': 0, 'watchDurationSum': 0
+    }
+
+    views   = totals['views']
+    clicks  = totals['clicks']
+    skips   = totals['skips']
+    watch_sum = totals['watchDurationSum']
+
+    avg_watch = watch_sum / views if views else 0
+    ctr       = (clicks / views * 100) if views else 0
+
+    BUDGET_LEVELS = {'low': 1, 'medium': 2, 'high': 3}
+    budget = ad_doc.get('adDetails', {}).get('budget', '').strip().lower()
+    conv_rate = (clicks / BUDGET_LEVELS.get(budget, 1) * 100) if views else 0
+
+    return jsonify({
+        'adId': ad_id,
+        'dateRange': {'from': date_from, 'to': date_to},
+        'adStats': {
+            'views': views,
+            'clicks': clicks,
+            'skips': skips,
+            'avgWatchDuration': round(avg_watch, 2),
+            'clickThroughRate': round(ctr, 2),
+            'conversionRate': round(conv_rate, 2)
         }
-        budget_value = ad.get('adDetails', {}).get('budget', '').strip().lower()
-        budget_level_score = BUDGET_LEVELS.get(budget_value, 1)
-        conversion_rate = clicks / budget_level_score * 100
+    }), 200
 
-        # Step 5: Return JSON
-        return jsonify({
-            "packageNames": list(events_collection.distinct('packageName', {'adId': ad_id})),
-            "adId": ad_id,
-            "adStats": {
-                "views": views,
+# Get ad statistics by performer
+@ad_routes_blueprint.route('/performers/<performer_id>/stats', methods=['GET'])
+def get_performer_statistics(performer_id):
+    """
+    Get statistics for all ads of a performer
+    ---
+    parameters:
+      - name: performer_id
+        in: path
+        type: string
+        required: true
+    responses:
+      200:
+        description: Performer ad statistics returned successfully
+      404:
+        description: Performer not found
+      500:
+        description: Server error
+    """
+    try:
+        performer = performers_collection.find_one({'_id': performer_id})
+        if not performer:
+            return jsonify({'error': 'Performer not found'}), 404
+
+        ad_ids = performer.get('ads', [])
+        stats_list = []
+
+        # Aggregate stats from daily_stats_collection by adId
+        pipeline = [
+            {'$match': {'performerId': performer_id}},
+            {'$group': {
+                '_id': '$adId',
+                'views': {'$sum': '$counts.view'},
+                'clicks': {'$sum': '$counts.click'},
+                'skips': {'$sum': '$counts.skip'},
+                'exits': {'$sum': '$counts.exit'},
+                'watchDurationSum': {'$sum': '$watchDurationSum'}
+            }}
+        ]
+
+        ad_stats = {stat['_id']: stat for stat in daily_stats_collection.aggregate(pipeline) if stat['_id'] in ad_ids}
+        
+        for ad_id in ad_ids:
+            stats = ad_stats.get(ad_id, {
+                'views': 0, 'clicks': 0, 'skips': 0, 'exits': 0, 'watchDurationSum': 0
+            })
+            
+            view_count = stats.get('views', 0)
+            watch_sum = stats.get('watchDurationSum', 0)
+            clicks = stats.get('clicks', 0)
+            
+            avg_watch = watch_sum / view_count if view_count else 0
+            ctr = (clicks / view_count * 100) if view_count else 0
+
+            stats_list.append({
+                "adId": ad_id,
+                "views": view_count,
                 "clicks": clicks,
-                "skips": skips,
-                "avgWatchDuration": round(avg_watch_duration, 2),
-                "clickThroughRate": round(ctr, 2),
-                "conversionRate": round(conversion_rate, 2)
-            }
+                "skips": stats.get('skips', 0),
+                "exits": stats.get('exits', 0),
+                "avgWatchDuration": round(avg_watch, 2),
+                "clickThroughRate": round(ctr, 2)
+            })
+
+        return jsonify({
+            "performerId": performer_id,
+            "adsStats": stats_list
         }), 200
 
-    except Exception:
-        return jsonify({'error': 'Failed to retrieve ad statistics'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Failed to retrieve performer statistics: {str(e)}'}), 500
