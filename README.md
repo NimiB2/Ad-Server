@@ -22,7 +22,8 @@ The Ad SDK system consists of several interconnected components that work togeth
 ---
 
 ## Documentation
-Interactive Swagger docs are generated automatically at **`/apidocs/`** once the server is running.
+
+For detailed documentation, visit [AdSDK Documentation](https://nimib2.github.io/AdSDK/).
 
 ---
 
