@@ -15,8 +15,9 @@ It exposes secure endpoints for advertisers to upload creatives, retrieve realâ€
 The Ad SDK system consists of several interconnected components that work together to deliver ads to mobile applications:
 
 
-![image](https://github.com/user-attachments/assets/e4b1569d-e86d-41d7-a824-c2f7c30b42f0)
-
+<div align="center">
+    <img src="https://github.com/user-attachments/assets/e4b1569d-e86d-41d7-a824-c2f7c30b42f0" alt="Project Image" width="240"/>
+</div>
 
 ---
 
