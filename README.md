@@ -92,5 +92,14 @@ Further details—including payload schemas—are visible in Swagger.
 ---
 
 ## License
-See the root project license. Backend usage is governed by the same terms as the AdSDK.
+Copyright 2025 Nimrod Bar
 
+Licensed for use with the AdSDK Project (the "Software");
+
+You are permitted to use, modify, and distribute this Software for personal, academic, or commercial purposes, subject to the following conditions:
+
+- You must retain this copyright notice and a copy of this license in all copies or substantial portions of the Software.
+- You may not use the Software to create or distribute a competing advertising SDK or ad-serving platform without prior written permission from the copyright holder.
+- The Software is provided "AS IS", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, or non-infringement.
+
+Use of the Software is conditional upon your acceptance of these terms.
