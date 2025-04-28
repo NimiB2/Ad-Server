@@ -16,7 +16,7 @@ The Ad SDK system consists of several interconnected components that work togeth
 
 
 <div align="center">
-    <img src="https://github.com/user-attachments/assets/e4b1569d-e86d-41d7-a824-c2f7c30b42f0" alt="Project Image" width="240"/>
+    <img src="https://github.com/user-attachments/assets/e4b1569d-e86d-41d7-a824-c2f7c30b42f0" alt="Project Image" width="320"/>
 </div>
 
 ---
