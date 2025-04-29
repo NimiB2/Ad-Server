@@ -92,14 +92,15 @@ Further details—including payload schemas—are visible in Swagger.
 ---
 
 ## License
-Copyright 2025 Nimrod Bar
 
-Licensed for use with the AdSDK Project (the "Software");
+MIT License - Copyright © 2025 Nimrod Bar
 
-You are permitted to use, modify, and distribute this Software for personal, academic, or commercial purposes, subject to the following conditions:
+This study project is created for educational purposes only. Demo content is not for commercial use.
 
-- You must retain this copyright notice and a copy of this license in all copies or substantial portions of the Software.
-- You may not use the Software to create or distribute a competing advertising SDK or ad-serving platform without prior written permission from the copyright holder.
-- The Software is provided "AS IS", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, or non-infringement.
+Permission is granted to use, copy, modify, and distribute this software subject to including the above copyright notice and permission notice in all copies.
 
-Use of the Software is conditional upon your acceptance of these terms.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+
+[Full license](https://opensource.org/licenses/MIT)
+
+---
