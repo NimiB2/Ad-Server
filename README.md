@@ -6,7 +6,7 @@ It exposes secure endpoints for advertisers to upload creatives, retrieve realâ€
 
 > **Note**  
 > This README focuses solely on the Flask backend.  
-> Android integration details live in the [AdSDK library README](../README.md).
+> Android integration details live in the [AdSDK library README](https://github.com/NimiB2/Android-SDK-Ads#readme).
 
 ---
 
