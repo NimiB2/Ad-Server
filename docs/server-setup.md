@@ -1,9 +1,7 @@
 ---
 layout: default
 title: Server Setup
-parent: Server Documentation
 nav_order: 7
-permalink: /server/server-setup/
 ---
 # Server Setup
 
