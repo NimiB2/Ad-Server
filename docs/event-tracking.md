@@ -1,3 +1,10 @@
+---
+layout: default
+title: Event Tracking
+parent: Server Documentation
+nav_order: 4
+permalink: /server/event-tracking/
+---
 # Event Tracking
 
 This document explains how the Flask Ad Server tracks and processes ad events received from the Android SDK.
