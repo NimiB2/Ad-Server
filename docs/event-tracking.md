@@ -1,9 +1,7 @@
 ---
 layout: default
 title: Event Tracking
-parent: Server Documentation
 nav_order: 4
-permalink: /server/event-tracking/
 ---
 # Event Tracking
 
