@@ -1,3 +1,10 @@
+---
+layout: default
+title: Database Schema
+parent: Server Documentation
+nav_order: 3
+permalink: /server/database-schema/
+---
 # Database Schema
 
 The Flask Ad Server uses MongoDB to store ads, performers, and event tracking data. This document outlines the collection structure and relationships.
