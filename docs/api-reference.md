@@ -1,3 +1,10 @@
+---
+layout: default
+title: API Reference
+parent: Server Documentation
+nav_order: 2
+permalink: /server/api-reference/
+---
 # API Reference
 
 This document provides detailed information about the available API endpoints in the Flask Ad Server.
