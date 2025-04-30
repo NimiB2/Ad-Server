@@ -1,9 +1,7 @@
 ---
 layout: default
 title: SDK Support
-parent: Server Documentation
 nav_order: 6
-permalink: /server/sdk-support/
 ---
 # SDK Support
 
