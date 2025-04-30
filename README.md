@@ -4,10 +4,6 @@
 The **Flask Ad Server** is a lightweight RESTful backend that powers campaign management, ad delivery, and analytics for the AdSDK ecosystem.  
 It exposes secure endpoints for advertisers to upload creatives, retrieve real‑time statistics, and for the SDK to request ads and log events.
 
-> **Note**  
-> This README focuses solely on the Flask backend.  
-> Android integration details live in the [AdSDK library README](https://github.com/NimiB2/Android-SDK-Ads#readme).
-
 ---
 
 ### Project Architecture
