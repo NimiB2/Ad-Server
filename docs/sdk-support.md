@@ -1,3 +1,10 @@
+---
+layout: default
+title: SDK Support
+parent: Server Documentation
+nav_order: 6
+permalink: /server/sdk-support/
+---
 # SDK Support
 
 This document explains how the Flask Ad Server supports the Android AdSDK and the communication between the two components.
