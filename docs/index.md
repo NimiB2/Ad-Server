@@ -1,3 +1,9 @@
+---
+layout: default
+title: Home
+nav_order: 1
+permalink: /
+---
 # Flask Ad Server Documentation
 
 ## Overview
