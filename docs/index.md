@@ -9,6 +9,22 @@ nav_order: 1
 
 The Flask Ad Server is the backend component that powers the AdSDK ecosystem. It handles ad management, delivery, and analytics tracking through a RESTful API interface.
 
+
+---
+
+### Project Architecture
+
+The Ad SDK system consists of several interconnected components that work together to deliver ads to mobile applications:
+
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/NimiB2/Android-SDK-Ads/main/docs/assets/architecture-diagram.jpg"
+       alt="Project Architecture Diagram" width="600"/>
+</div>
+
+---
+
+
 ## Documentation Sections
 
 - [Server Setup](server-setup.md) - Installation and deployment guide
