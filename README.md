@@ -23,7 +23,7 @@ The Ad SDK system consists of several interconnected components that work togeth
 
 ## Documentation
 
-For detailed documentation, visit [AdSDK Documentation](https://nimib2.github.io/AdSDK/).
+For detailed documentation, visit [AdSDK Documentation](https://nimib2.github.io/Ad-Server/).
 
 ---
 
