@@ -1,9 +1,7 @@
 ---
 layout: default
 title: Database Schema
-parent: Server Documentation
 nav_order: 3
-permalink: /server/database-schema/
 ---
 # Database Schema
 
