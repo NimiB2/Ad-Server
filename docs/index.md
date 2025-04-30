@@ -48,4 +48,4 @@ Registers the ad blueprint with the main application.
 
 ## Related Documentation
 
-For the client-side SDK that consumes this API, see the [Android AdSDK Documentation](https://github.com/YourUsername/adsdk-repo).
+For the client-side SDK that consumes this API, see the [Android AdSDK Documentation](https://nimib2.github.io/Android-SDK-Ads/).
