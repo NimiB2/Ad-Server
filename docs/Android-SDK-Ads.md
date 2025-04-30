@@ -8,7 +8,7 @@ permalink: /android-sdk/
 # Android SDK Documentation
 
 Guides for integrating **AdSDK** in Android apps  
-Source repo: **[Android-SDK-Ads](https://nimib2.github.io/Android-SDK-Ads/)**
+**[Android AdSDK Documentation](https://nimib2.github.io/Android-SDK-Ads/)**
 
 ## Documentation Sections
 
