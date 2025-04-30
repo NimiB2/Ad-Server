@@ -1,9 +1,7 @@
 ---
 layout: default
 title: Analytics
-parent: Server Documentation
 nav_order: 5
-permalink: /server/analytics/
 ---
 # Analytics
 
