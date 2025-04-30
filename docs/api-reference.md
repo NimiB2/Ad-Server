@@ -1,9 +1,7 @@
 ---
 layout: default
 title: API Reference
-parent: Server Documentation
 nav_order: 2
-permalink: /server/api-reference/
 ---
 # API Reference
 
