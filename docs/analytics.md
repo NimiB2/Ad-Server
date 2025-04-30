@@ -1,3 +1,10 @@
+---
+layout: default
+title: Analytics
+parent: Server Documentation
+nav_order: 5
+permalink: /server/analytics/
+---
 # Analytics
 
 This document explains the analytics capabilities of the Flask Ad Server, including data collection, processing, and reporting.
