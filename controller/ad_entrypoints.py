@@ -309,29 +309,29 @@ responses:
 @ad_routes_blueprint.route('/ads/<ad_id>', methods=['PUT'])
 def update_ad(ad_id):
     """
-Update an existing ad
----
-parameters:
-  - name: ad_id
-    in: path
-    type: string
-    required: true
-    description: The ID of the ad to update
-  - name: ad
-    in: body
-    required: true
-    description: The updated ad data
-    schema:
-      $ref: '#/definitions/Ad'
-responses:
-  200:
-    description: The ad was updated successfully
-  404:
-    description: Ad not found
-  400:
-    description: The request was invalid
-  500:
-    description: An error occurred while updating the ad
+    Update an existing ad
+    ---
+    parameters:
+      - name: ad_id
+        in: path
+        type: string
+        required: true
+        description: The ID of the ad to update
+      - name: ad
+        in: body
+        required: true
+        description: The updated ad data
+        schema:
+          $ref: '#/definitions/Ad'
+    responses:
+      200:
+        description: The ad was updated successfully
+      404:
+        description: Ad not found
+      400:
+        description: The request was invalid
+      500:
+        description: An error occurred while updating the ad
     """
     update_data = request.json
     if not isinstance(update_data, dict):
@@ -397,38 +397,25 @@ def get_random_ad():
       500:
         description: An error occurred while retrieving a random ad
     """
-    package_name = request.args.get('packageName')
 
+    package_name = request.args.get('packageName')
     if not isinstance(package_name, str) or not package_name.strip():
         return jsonify({'error': 'Missing or invalid packageName'}), 400
-    package_name = package_name.strip()
+    package_name = package_name.strip() 
 
     try:
-        # Find ad IDs that have appeared for this package_name
-        pipeline = [
-            {'$match': {'events.packageName': package_name}},
-            {'$unwind': '$events'},
-            {'$match': {'events.packageName': package_name}},
-            {'$group': {'_id': '$events.adId'}}
-        ]
+        all_ads = list(ads_collection.find())
         
-        appeared_ad_ids = [doc['_id'] for doc in events_by_day_collection.aggregate(pipeline)]
+        if not all_ads:
+            return jsonify({'message': 'No ads available'}), 204
 
-        unappeared_ads = list(
-            ads_collection.find({'_id': {'$nin': appeared_ad_ids}})
-        )
-        if not unappeared_ads:
-            unappeared_ads = list(ads_collection.find())
-            if not unappeared_ads:
-                return jsonify({'message': 'No ads available'}), 204
-
-        chosen_ad = random.choice(unappeared_ads)
+        chosen_ad = random.choice(all_ads)
         chosen_ad['_id'] = str(chosen_ad['_id'])
         return jsonify(chosen_ad), 200
 
     except Exception as e:
         return jsonify({'error': f'Failed to retrieve random ad: {str(e)}'}), 500
-    
+
 # Send ad event
 @ad_routes_blueprint.route('/ad_event', methods=['POST'])
 def send_ad_event():
