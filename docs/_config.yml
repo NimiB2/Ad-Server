@@ -1,0 +1,18 @@
+title: Flask Ad Server Documentation
+description: Backend documentation for the AdSDK ad delivery system
+remote_theme: pmarsceill/just-the-docs
+color_scheme: light
+
+# Enable search
+search_enabled: true
+
+# Aux links for the upper right navigation
+aux_links:
+  "Ad Server on GitHub":
+    - "https://github.com/NimiB2/Ad-Server"
+  "Android SDK Documentation":
+    - "https://nimib2.github.io/Android-SDK-Ads/"
+
+# Back to top link
+back_to_top: true
+back_to_top_text: "Back to top"
