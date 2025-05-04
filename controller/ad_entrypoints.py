@@ -4,6 +4,8 @@ import random
 from datetime import datetime, timezone
 from email_validator import validate_email, EmailNotValidError
 import uuid
+import re
+
 
 ad_routes_blueprint = Blueprint('ads', __name__)
 
@@ -102,17 +104,9 @@ def create_performer():
     if not name or not email:
         return jsonify({'error': 'Name and email cannot be empty'}), 400
     
-    try:
-        valid = validate_email(email)
-        email = valid.email 
-    except EmailNotValidError as e:
-        return jsonify({'error': f'Invalid email format: {str(e)}'}), 400
-    except ImportError:
-        import re
-        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(email_regex, email):
-            return jsonify({'error': 'Invalid email format'}), 400
-
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_regex, email):
+        return jsonify({'error': 'Invalid email format'}), 400
     existing = performers_collection.find_one({'email': email})
     if existing:
         return jsonify({
