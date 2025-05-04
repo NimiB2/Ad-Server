@@ -126,7 +126,48 @@ def create_performer():
         return jsonify({'message': 'Performer created', 'performerId': performer['_id']}), 201
     except Exception as e:
         return jsonify({'error': f'Failed to create performer: {str(e)}'}), 500
+
+# check if performer exists by email
+@ad_routes_blueprint.route('/performers/check-email', methods=['POST'])
+def check_performer_email():
+    """
+    Check if a performer exists with the given email
+    ---
+    parameters:
+      - name: email_data
+        in: body
+        required: true
+        description: The email to check
+        schema:
+          properties:
+            email:
+              type: string
+              format: email
+              description: The performer's email
+    responses:
+      200:
+        description: Email exists
+        schema:
+          properties:
+            exists:
+              type: boolean
+              example: true
+      400:
+        description: Invalid input or email format
+    """
+    data = request.json
+    if 'email' not in data or not data['email'].strip():
+        return jsonify({'error': 'Missing or empty email'}), 400
     
+    email = data['email'].strip()
+    
+    # Check if email exists
+    existing = performers_collection.find_one({'email': email})
+    if existing:
+        return jsonify({'exists': True, 'performerId': existing['_id']}), 200
+    else:
+        return jsonify({'exists': False}), 200
+
 # Create new ad
 @ad_routes_blueprint.route('/ads', methods=['POST'])
 def create_ad():
