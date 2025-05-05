@@ -403,13 +403,36 @@ def delete_ad(ad_id):
         description: An error occurred while deleting the ad
     """
     try:
-        result = ads_collection.delete_one({'_id': ad_id})
-        if result.deleted_count:
-            return jsonify({'message': 'Ad deleted'}), 200
-        return jsonify({'error': 'Ad not found'}), 404
-    except Exception:
-        return jsonify({'error': 'Failed to delete ad'}), 500
-
+        # 1. First find the ad to get performer ID
+        ad = ads_collection.find_one({'_id': ad_id})
+        if not ad:
+            return jsonify({'error': 'Ad not found'}), 404
+            
+        performer_id = ad.get('performerId')
+        
+        # 2. Delete ad from ads collection
+        ads_collection.delete_one({'_id': ad_id})
+        
+        # 3. Remove ad from performer's ads array
+        performers_collection.update_one(
+            {'_id': performer_id},
+            {'$pull': {'ads': ad_id}}
+        )
+        
+        # 4. Clean up events that reference this ad
+        # (Optional) Filter by date for performance on large collections
+        events_by_day_collection.update_many(
+            {},
+            {'$pull': {'events': {'adId': ad_id}}}
+        )
+        
+        # 5. Remove statistics for this ad
+        daily_stats_collection.delete_many({'adId': ad_id})
+        
+        return jsonify({'message': 'Ad and related data deleted successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': f'Failed to delete ad: {str(e)}'}), 500
+        
 # Get random ad for app
 @ad_routes_blueprint.route('/ads/random', methods=['GET'])
 def get_random_ad():
