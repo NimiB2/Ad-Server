@@ -27,7 +27,6 @@ try:
 except Exception as _idx_err:
     print(f"[Init] daily_performer_stats index skipped/failed: {_idx_err}")
 
-
 # Create performer
 @ad_routes_blueprint.route('/performers', methods=['POST'])
 def create_performer():
@@ -167,6 +166,26 @@ def check_performer_email():
         return jsonify({'exists': True, 'performerId': existing['_id']}), 200
     else:
         return jsonify({'exists': False}), 200
+
+# Get all performers (for admin/developer view)
+@ad_routes_blueprint.route('/performers', methods=['GET'])
+def get_all_performers():
+    """
+    Get all performers (admin/developer only)
+    ---
+    responses:
+      200:
+        description: A list of all performers was returned successfully
+      500:
+        description: An error occurred while retrieving performers
+    """
+    try:
+        performers = list(performers_collection.find())
+        for performer in performers:
+            performer['_id'] = str(performer['_id'])
+        return jsonify(performers), 200
+    except Exception:
+        return jsonify({'error': 'Failed to retrieve performers'}), 500
 
 # Create new ad
 @ad_routes_blueprint.route('/ads', methods=['POST'])
