@@ -207,6 +207,43 @@ def developer_login():
     else:
         return jsonify({'exists': False}), 404
 
+#Developer Create
+@ad_routes_blueprint.route('/developers', methods=['POST'])
+def create_developer():
+    """
+    Create a new developer
+    """
+    data = request.json
+    required_fields = ['name', 'email']
+    if not all(field in data for field in required_fields):
+        return jsonify({'error': 'Missing name or email'}), 400
+
+    name = data['name'].strip()
+    email = data['email'].strip()
+    if not name or not email:
+        return jsonify({'error': 'Name and email cannot be empty'}), 400
+    
+    # Check if email exists
+    existing = developers_collection.find_one({'email': email})
+    if existing:
+        return jsonify({
+            'message': 'Developer already exists',
+            'developerId': existing['_id']
+        }), 200
+
+    developer = {
+        "_id": str(uuid.uuid4()),
+        "name": name,
+        "email": email,
+        "createdAt": datetime.now(timezone.utc).isoformat()
+    }
+
+    try:
+        developers_collection.insert_one(developer)
+        return jsonify({'message': 'Developer created', 'developerId': developer['_id']}), 201
+    except Exception as e:
+        return jsonify({'error': f'Failed to create developer: {str(e)}'}), 500
+
 # Create new ad
 @ad_routes_blueprint.route('/ads', methods=['POST'])
 def create_ad():
