@@ -188,11 +188,53 @@ def get_all_performers():
     except Exception:
         return jsonify({'error': 'Failed to retrieve performers'}), 500
 
-#Developer Login
+# Login developer
 @ad_routes_blueprint.route('/developers/login', methods=['POST'])
 def developer_login():
     """
-    Verify developer credentials
+    Developer Login
+    ---
+    tags:
+      - developers
+    parameters:
+      - name: credentials
+        in: body
+        required: true
+        description: Developer email for login
+        schema:
+          type: object
+          required:
+            - email
+          properties:
+            email:
+              type: string
+              format: email
+              description: Developer's email
+    responses:
+      200:
+        description: Developer found and login successful
+        schema:
+          properties:
+            exists:
+              type: boolean
+              example: true
+            developerId:
+              type: string
+              example: "dev-uuid-1"
+      404:
+        description: Developer not found
+        schema:
+          properties:
+            exists:
+              type: boolean
+              example: false
+      400:
+        description: Invalid request
+        schema:
+          properties:
+            error:
+              type: string
+              example: "Missing email"
     """
     data = request.json
     if 'email' not in data:
@@ -203,15 +245,74 @@ def developer_login():
     # Check if developer exists
     developer = developers_collection.find_one({'email': email})
     if developer:
-        return jsonify({'exists': True, 'developerId': developer['_id']}), 200
+        return jsonify({
+            'exists': True, 
+            'developerId': developer['_id']
+        }), 200
     else:
         return jsonify({'exists': False}), 404
 
-#Developer Create
+# Create a developer
 @ad_routes_blueprint.route('/developers', methods=['POST'])
 def create_developer():
     """
     Create a new developer
+    ---
+    tags:
+      - developers
+    parameters:
+      - name: developer
+        in: body
+        required: true
+        description: The developer to create
+        schema:
+          type: object
+          required:
+            - name
+            - email
+          properties:
+            name:
+              type: string
+              description: The developer's name
+            email:
+              type: string
+              format: email
+              description: The developer's email (must be unique)
+    responses:
+      201:
+        description: Developer created successfully
+        schema:
+          properties:
+            message:
+              type: string
+              example: "Developer created"
+            developerId:
+              type: string
+              example: "dev-uuid-1"
+      200:
+        description: Developer already exists
+        schema:
+          properties:
+            message:
+              type: string
+              example: "Developer already exists"
+            developerId:
+              type: string
+              example: "dev-uuid-1"
+      400:
+        description: Invalid input or email format
+        schema:
+          properties:
+            error:
+              type: string
+              example: "Invalid email format"
+      500:
+        description: Internal server error
+        schema:
+          properties:
+            error:
+              type: string
+              example: "Failed to create developer"
     """
     data = request.json
     required_fields = ['name', 'email']
@@ -222,6 +323,10 @@ def create_developer():
     email = data['email'].strip()
     if not name or not email:
         return jsonify({'error': 'Name and email cannot be empty'}), 400
+    
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_regex, email):
+        return jsonify({'error': 'Invalid email format'}), 400
     
     # Check if email exists
     existing = developers_collection.find_one({'email': email})
