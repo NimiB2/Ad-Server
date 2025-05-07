@@ -15,6 +15,7 @@ performers_collection = db['performers']
 events_collection = db['ad_events']
 daily_stats_collection = db['daily_ad_stats']
 events_by_day_collection = db['events_by_day']
+developers_collection = db['developers']
 
 
 # Create index for daily stats
@@ -186,6 +187,25 @@ def get_all_performers():
         return jsonify(performers), 200
     except Exception:
         return jsonify({'error': 'Failed to retrieve performers'}), 500
+
+#Developer Login
+@ad_routes_blueprint.route('/developers/login', methods=['POST'])
+def developer_login():
+    """
+    Verify developer credentials
+    """
+    data = request.json
+    if 'email' not in data:
+        return jsonify({'error': 'Missing email'}), 400
+    
+    email = data['email'].strip()
+    
+    # Check if developer exists
+    developer = developers_collection.find_one({'email': email})
+    if developer:
+        return jsonify({'exists': True, 'developerId': developer['_id']}), 200
+    else:
+        return jsonify({'exists': False}), 404
 
 # Create new ad
 @ad_routes_blueprint.route('/ads', methods=['POST'])
