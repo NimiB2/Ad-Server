@@ -31,7 +31,7 @@ try:
 except Exception as e:
     print(f"[Init] Index creation failed: {e}")
 
-# Helper functions for event handling
+# Helper functions
 def apply_date_filter(match_dict, args):
     """Apply date filtering based on query parameters"""
     date_from = args.get('from')
@@ -57,6 +57,63 @@ def build_stats_pipeline(match_criteria):
             'watchDurationSum': {'$sum': '$watchDurationSum'}
         }}
     ]
+
+def validate_email_format(email):
+    """
+    Validate if a string is a properly formatted email address
+    
+    Args:
+        email (str): The email address to validate
+        
+    Returns:
+        bool: True if email is valid, False otherwise
+    """
+    if not email or not isinstance(email, str):
+        return False
+    
+    email = email.strip()
+    if not email:
+        return False
+    
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(email_regex, email))
+
+def calculate_ad_stats(stats_data, budget=None):
+    """
+    Calculate ad statistics from raw aggregation data
+    
+    Args:
+        stats_data (dict): Raw aggregation data with views, clicks, etc.
+        budget (str, optional): Budget level for conversion rate calculation
+        
+    Returns:
+        dict: Calculated statistics
+    """
+    views = stats_data.get('views', 0)
+    clicks = stats_data.get('clicks', 0)
+    skips = stats_data.get('skips', 0)
+    watch_sum = stats_data.get('watchDurationSum', 0)
+    
+    # Calculate derived metrics
+    avg_watch = watch_sum / views if views else 0
+    ctr = (clicks / views * 100) if views else 0
+    
+    stats = {
+        "views": views,
+        "clicks": clicks,
+        "skips": skips,
+        "avgWatchDuration": round(avg_watch, 2),
+        "clickThroughRate": round(ctr, 2)
+    }
+    
+    # Add conversion rate if budget is provided
+    if budget:
+        BUDGET_LEVELS = {'low': 1, 'medium': 2, 'high': 3}
+        budget_level = budget.strip().lower() if isinstance(budget, str) else ''
+        conv_rate = (clicks / BUDGET_LEVELS.get(budget_level, 1) * 100) if views else 0
+        stats["conversionRate"] = round(conv_rate, 2)
+    
+    return stats
 
 # Create performer
 @ad_routes_blueprint.route('/performers', methods=['POST'])
@@ -134,9 +191,9 @@ def create_performer():
     if not name or not email:
         return jsonify({'error': 'Name and email cannot be empty'}), 400
     
-    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    if not re.match(email_regex, email):
+    if not validate_email_format(email):
         return jsonify({'error': 'Invalid email format'}), 400
+
     existing = performers_collection.find_one({'email': email})
     if existing:
         return jsonify({
@@ -191,6 +248,9 @@ def check_performer_email():
     
     email = data['email'].strip()
     
+    if not validate_email_format(email):
+      return jsonify({'error': 'Invalid email format'}), 400
+
     # Check if email exists
     existing = performers_collection.find_one({'email': email})
     if existing:
@@ -271,6 +331,9 @@ def developer_login():
         return jsonify({'error': 'Missing email'}), 400
     
     email = data['email'].strip()
+
+    if not validate_email_format(email):
+      return jsonify({'error': 'Invalid email format'}), 400
     
     # Check if developer exists
     developer = developers_collection.find_one({'email': email})
@@ -354,10 +417,9 @@ def create_developer():
     if not name or not email:
         return jsonify({'error': 'Name and email cannot be empty'}), 400
     
-    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    if not re.match(email_regex, email):
+    if not validate_email_format(email):
         return jsonify({'error': 'Invalid email format'}), 400
-    
+
     # Check if email exists
     existing = developers_collection.find_one({'email': email})
     if existing:
@@ -873,50 +935,24 @@ def get_ad_statistics(ad_id):
     ad_doc = ads_collection.find_one({'_id': ad_id})
     if not ad_doc:
         return jsonify({'error': 'Ad not found'}), 404
-        
+
     match = {'adId': ad_id}
     apply_date_filter(match, request.args)
 
-    pipeline = [
-        {'$match': match},
-        {'$group': {
-            '_id': '$adId',
-            'views': {'$sum': '$counts.view'},
-            'clicks': {'$sum': '$counts.click'},
-            'skips': {'$sum': '$counts.skip'},
-            'exits': {'$sum': '$counts.exit'},
-            'watchDurationSum': {'$sum': '$watchDurationSum'}
-        }}
-    ]
-
+    pipeline = build_stats_pipeline(match)
     agg = list(daily_stats_collection.aggregate(pipeline))
+    
     totals = agg[0] if agg else {
         'views': 0, 'clicks': 0, 'skips': 0, 'exits': 0, 'watchDurationSum': 0
     }
 
-    views = totals['views']
-    clicks = totals['clicks']
-    skips = totals['skips']
-    watch_sum = totals['watchDurationSum']
-
-    avg_watch = watch_sum / views if views else 0
-    ctr = (clicks / views * 100) if views else 0
-
-    BUDGET_LEVELS = {'low': 1, 'medium': 2, 'high': 3}
-    budget = ad_doc.get('adDetails', {}).get('budget', '').strip().lower()
-    conv_rate = (clicks / BUDGET_LEVELS.get(budget, 1) * 100) if views else 0
+    budget = ad_doc.get('adDetails', {}).get('budget', '')
+    stats = calculate_ad_stats(totals, budget)
 
     return jsonify({
         'adId': ad_id,
         'dateRange': {'from': request.args.get('from'), 'to': request.args.get('to')},
-        'adStats': {
-            'views': views,
-            'clicks': clicks,
-            'skips': skips,
-            'avgWatchDuration': round(avg_watch, 2),
-            'clickThroughRate': round(ctr, 2),
-            'conversionRate': round(conv_rate, 2)
-        }
+        'adStats': stats
     }), 200
 
 # Get ad statistics by performer
@@ -930,6 +966,18 @@ def get_performer_statistics(performer_id):
         in: path
         type: string
         required: true
+      - name: from
+        in: query
+        type: string
+        required: false
+        format: date
+        description: (Optional) Inclusive start date — ISO-8601 YYYY-MM-DD
+      - name: to
+        in: query
+        type: string
+        required: false
+        format: date
+        description: (Optional) Inclusive end date — ISO-8601 YYYY-MM-DD
     responses:
       200:
         description: Performer ad statistics returned successfully
@@ -946,42 +994,24 @@ def get_performer_statistics(performer_id):
         ad_ids = performer.get('ads', [])
         stats_list = []
 
-        # Aggregate stats from daily_stats_collection by adId
-        pipeline = [
-            {'$match': {'performerId': performer_id}},
-            {'$group': {
-                '_id': '$adId',
-                'views': {'$sum': '$counts.view'},
-                'clicks': {'$sum': '$counts.click'},
-                'skips': {'$sum': '$counts.skip'},
-                'exits': {'$sum': '$counts.exit'},
-                'watchDurationSum': {'$sum': '$watchDurationSum'}
-            }}
-        ]
+        match = {'performerId': performer_id}
+        apply_date_filter(match, request.args)
 
+        # Use helper function to build the pipeline
+        pipeline = build_stats_pipeline(match)
         ad_stats = {stat['_id']: stat for stat in daily_stats_collection.aggregate(pipeline) if stat['_id'] in ad_ids}
+
         
         for ad_id in ad_ids:
             stats = ad_stats.get(ad_id, {
                 'views': 0, 'clicks': 0, 'skips': 0, 'exits': 0, 'watchDurationSum': 0
             })
             
-            view_count = stats.get('views', 0)
-            watch_sum = stats.get('watchDurationSum', 0)
-            clicks = stats.get('clicks', 0)
-            
-            avg_watch = watch_sum / view_count if view_count else 0
-            ctr = (clicks / view_count * 100) if view_count else 0
+            ad_stats_result = calculate_ad_stats(stats)
+            ad_stats_result["adId"] = ad_id
+            ad_stats_result["exits"] = stats.get('exits', 0) 
+            stats_list.append(ad_stats_result)
 
-            stats_list.append({
-                "adId": ad_id,
-                "views": view_count,
-                "clicks": clicks,
-                "skips": stats.get('skips', 0),
-                "exits": stats.get('exits', 0),
-                "avgWatchDuration": round(avg_watch, 2),
-                "clickThroughRate": round(ctr, 2)
-            })
 
         return jsonify({
             "performerId": performer_id,
