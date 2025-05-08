@@ -12,7 +12,6 @@ ad_routes_blueprint = Blueprint('ads', __name__)
 db = MongoConnectionManager.get_db()
 ads_collection = db['ads']
 performers_collection = db['performers']
-events_collection = db['ad_events']
 daily_stats_collection = db['daily_ad_stats']
 events_by_day_collection = db['events_by_day']
 developers_collection = db['developers']
@@ -20,13 +19,46 @@ developers_collection = db['developers']
 
 # Create index for daily stats
 try:
-    daily_stats_collection.create_index(
+    # Index for performer stats queries
+    stats_collection.create_index(
         [("performerId", 1), ("date", 1)],
-        unique=True,
-        name="uniq_performer_date"
+        name="performer_date_idx"
     )
-except Exception as _idx_err:
-    print(f"[Init] daily_performer_stats index skipped/failed: {_idx_err}")
+    
+    # Index for ad stats queries
+    stats_collection.create_index(
+        [("adId", 1), ("date", 1)],
+        name="ad_date_idx"
+    )
+except Exception as e:
+    print(f"[Init] Index creation failed: {e}")
+
+# Helper functions for event handling
+def apply_date_filter(match_dict, args):
+    """Apply date filtering based on query parameters"""
+    date_from = args.get('from')
+    date_to = args.get('to')
+    
+    if date_from or date_to:
+        match_dict['date'] = {}
+        if date_from:
+            match_dict['date']['$gte'] = date_from
+        if date_to:
+            match_dict['date']['$lte'] = date_to
+
+def build_stats_pipeline(match_criteria):
+    """Build a standard stats aggregation pipeline"""
+    return [
+        {'$match': match_criteria},
+        {'$group': {
+            '_id': '$adId',
+            'views': {'$sum': '$counts.view'},
+            'clicks': {'$sum': '$counts.click'},
+            'skips': {'$sum': '$counts.skip'},
+            'exits': {'$sum': '$counts.exit'},
+            'watchDurationSum': {'$sum': '$watchDurationSum'}
+        }}
+    ]
 
 # Create performer
 @ad_routes_blueprint.route('/performers', methods=['POST'])
@@ -496,22 +528,22 @@ def get_all_ads():
 @ad_routes_blueprint.route('/ads/<ad_id>', methods=['GET'])
 def get_ad_by_id(ad_id):
     """
-Get an ad by ID
----
-parameters:
-  - name: ad_id
-    in: path
-    type: string
-    required: true
-    description: The ID of the ad to retrieve
-responses:
-  200:
-    description: The ad was returned successfully
-  404:
-    description: Ad not found
-  500:
-    description: An error occurred while retrieving the ad
-    """
+  Get an ad by ID
+  ---
+    parameters:
+      - name: ad_id
+        in: path
+        type: string
+        required: true
+        description: The ID of the ad to retrieve
+    responses:
+      200:
+        description: The ad was returned successfully
+      404:
+        description: Ad not found
+      500:
+        description: An error occurred while retrieving the ad
+        """
     try:
         ad = ads_collection.find_one({'_id': ad_id})
         if ad:
@@ -708,7 +740,7 @@ def send_ad_event():
     """
     data = request.json
 
-    if 'adId' not in data or 'timestamp' not in data or 'eventDetails' not in data:
+   if 'adId' not in data or 'timestamp' not in data or 'eventDetails' not in data:
         return jsonify({'error': 'Missing adId, timestamp or eventDetails'}), 400
 
     ad_id = data['adId']
@@ -783,8 +815,8 @@ def send_ad_event():
         }
         
         inc_fields = {f"counts.{event_type}": 1}
-        if event_type == "view":
-            inc_fields["watchDurationSum"] = watch_duration
+        
+        inc_fields["watchDurationSum"] = watch_duration
         
         daily_stats_collection.update_one(
             stats_key,
@@ -802,7 +834,7 @@ def send_ad_event():
 
     except Exception as e:
         return jsonify({'error': f'Failed to store event: {str(e)}'}), 500
-    
+
 # Get ad statistics by id
 @ad_routes_blueprint.route('/ads/<ad_id>/stats', methods=['GET'])
 def get_ad_statistics(ad_id):
@@ -840,29 +872,21 @@ def get_ad_statistics(ad_id):
       - Ads
     """
 
-    ad_doc = ads_collection.find_one({'_id': ad_id})
+     ad_doc = ads_collection.find_one({'_id': ad_id})
     if not ad_doc:
         return jsonify({'error': 'Ad not found'}), 404
 
     match = {'adId': ad_id}
-    date_from = request.args.get('from') 
-    date_to   = request.args.get('to')
-
-    if date_from or date_to:
-        match['date'] = {}
-        if date_from:
-            match['date']['$gte'] = date_from
-        if date_to:
-            match['date']['$lte'] = date_to
+    apply_date_filter(match, request.args)
 
     pipeline = [
         {'$match': match},
         {'$group': {
             '_id': '$adId',
-            'views':  {'$sum': '$counts.view'},
+            'views': {'$sum': '$counts.view'},
             'clicks': {'$sum': '$counts.click'},
-            'skips':  {'$sum': '$counts.skip'},
-            'exits':  {'$sum': '$counts.exit'},
+            'skips': {'$sum': '$counts.skip'},
+            'exits': {'$sum': '$counts.exit'},
             'watchDurationSum': {'$sum': '$watchDurationSum'}
         }}
     ]
@@ -872,13 +896,13 @@ def get_ad_statistics(ad_id):
         'views': 0, 'clicks': 0, 'skips': 0, 'exits': 0, 'watchDurationSum': 0
     }
 
-    views   = totals['views']
-    clicks  = totals['clicks']
-    skips   = totals['skips']
+    views = totals['views']
+    clicks = totals['clicks']
+    skips = totals['skips']
     watch_sum = totals['watchDurationSum']
 
     avg_watch = watch_sum / views if views else 0
-    ctr       = (clicks / views * 100) if views else 0
+    ctr = (clicks / views * 100) if views else 0
 
     BUDGET_LEVELS = {'low': 1, 'medium': 2, 'high': 3}
     budget = ad_doc.get('adDetails', {}).get('budget', '').strip().lower()
@@ -886,7 +910,7 @@ def get_ad_statistics(ad_id):
 
     return jsonify({
         'adId': ad_id,
-        'dateRange': {'from': date_from, 'to': date_to},
+        'dateRange': {'from': request.args.get('from'), 'to': request.args.get('to')},
         'adStats': {
             'views': views,
             'clicks': clicks,
