@@ -16,17 +16,15 @@ daily_stats_collection = db['daily_ad_stats']
 events_by_day_collection = db['events_by_day']
 developers_collection = db['developers']
 
-
-# Create index for daily stats
 try:
     # Index for performer stats queries
-    stats_collection.create_index(
+    daily_stats_collection.create_index(
         [("performerId", 1), ("date", 1)],
         name="performer_date_idx"
     )
     
     # Index for ad stats queries
-    stats_collection.create_index(
+    daily_stats_collection.create_index(
         [("adId", 1), ("date", 1)],
         name="ad_date_idx"
     )
@@ -740,7 +738,7 @@ def send_ad_event():
     """
     data = request.json
 
-   if 'adId' not in data or 'timestamp' not in data or 'eventDetails' not in data:
+    if 'adId' not in data or 'timestamp' not in data or 'eventDetails' not in data:
         return jsonify({'error': 'Missing adId, timestamp or eventDetails'}), 400
 
     ad_id = data['adId']
@@ -872,10 +870,10 @@ def get_ad_statistics(ad_id):
       - Ads
     """
 
-     ad_doc = ads_collection.find_one({'_id': ad_id})
+    ad_doc = ads_collection.find_one({'_id': ad_id})
     if not ad_doc:
         return jsonify({'error': 'Ad not found'}), 404
-
+        
     match = {'adId': ad_id}
     apply_date_filter(match, request.args)
 
