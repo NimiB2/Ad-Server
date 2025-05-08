@@ -115,72 +115,33 @@ def calculate_ad_stats(stats_data, budget=None):
     
     return stats
 
-# Create performer
+# Create new performer
 @ad_routes_blueprint.route('/performers', methods=['POST'])
 def create_performer():
     """
-    Create a new performer or return existing performer by email
+    Create a new performer or return existing by email
     ---
+    tags:
+      - Performers
     parameters:
       - name: performer
         in: body
         required: true
-        description: The performer to create
         schema:
-          id: Performer
-          required:
-            - name
-            - email
           properties:
             name:
               type: string
-              description: The performer's name
             email:
               type: string
-              format: email
-              description: The performer's email (must be unique and properly formatted)
-        examples:
-          application/json:
-            {
-              "name": "John Smith",
-              "email": "john.smith@example.com"
-            }
     responses:
       201:
         description: Performer created successfully
-        schema:
-          properties:
-            message:
-              type: string
-              example: "Performer created"
-            performerId:
-              type: string
-              example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
       200:
-        description: Performer already exists, returned existing ID
-        schema:
-          properties:
-            message:
-              type: string
-              example: "Performer already exists"
-            performerId:
-              type: string
-              example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        description: Performer already exists
       400:
         description: Invalid input or email format
-        schema:
-          properties:
-            error:
-              type: string
-              example: "Invalid email format"
-      500:
-        description: Internal server error
-        schema:
-          properties:
-            error:
-              type: string
-              example: "Failed to create performer"
     """
+  
     data = request.json
     required_fields = ['name', 'email']
     if not all(field in data for field in required_fields):
@@ -218,29 +179,23 @@ def create_performer():
 @ad_routes_blueprint.route('/performers/check-email', methods=['POST'])
 def check_performer_email():
     """
-    Check if a performer exists with the given email
+    Check if a performer exists with given email
     ---
+    tags:
+      - Performers
     parameters:
       - name: email_data
         in: body
         required: true
-        description: The email to check
         schema:
           properties:
             email:
               type: string
-              format: email
-              description: The performer's email
     responses:
       200:
-        description: Email exists
-        schema:
-          properties:
-            exists:
-              type: boolean
-              example: true
+        description: Returns whether email exists in system
       400:
-        description: Invalid input or email format
+        description: Missing or invalid email format
     """
     data = request.json
     if 'email' not in data or not data['email'].strip():
@@ -264,11 +219,13 @@ def get_all_performers():
     """
     Get all performers (admin/developer only)
     ---
+    tags:
+      - Performers
     responses:
       200:
-        description: A list of all performers was returned successfully
+        description: List of all performers
       500:
-        description: An error occurred while retrieving performers
+        description: Server error while retrieving performers
     """
     try:
         performers = list(performers_collection.find())
@@ -282,50 +239,27 @@ def get_all_performers():
 @ad_routes_blueprint.route('/developers/login', methods=['POST'])
 def developer_login():
     """
-    Developer Login
+    Developer login
     ---
     tags:
-      - developers
+      - Developers
     parameters:
       - name: credentials
         in: body
         required: true
-        description: Developer email for login
         schema:
-          type: object
-          required:
-            - email
           properties:
             email:
               type: string
-              format: email
-              description: Developer's email
     responses:
       200:
         description: Developer found and login successful
-        schema:
-          properties:
-            exists:
-              type: boolean
-              example: true
-            developerId:
-              type: string
-              example: "dev-uuid-1"
       404:
         description: Developer not found
-        schema:
-          properties:
-            exists:
-              type: boolean
-              example: false
       400:
-        description: Invalid request
-        schema:
-          properties:
-            error:
-              type: string
-              example: "Missing email"
+        description: Missing or invalid email
     """
+ 
     data = request.json
     if 'email' not in data:
         return jsonify({'error': 'Missing email'}), 400
@@ -352,61 +286,26 @@ def create_developer():
     Create a new developer
     ---
     tags:
-      - developers
+      - Developers
     parameters:
       - name: developer
         in: body
         required: true
-        description: The developer to create
         schema:
-          type: object
-          required:
-            - name
-            - email
           properties:
             name:
               type: string
-              description: The developer's name
             email:
               type: string
-              format: email
-              description: The developer's email (must be unique)
     responses:
       201:
         description: Developer created successfully
-        schema:
-          properties:
-            message:
-              type: string
-              example: "Developer created"
-            developerId:
-              type: string
-              example: "dev-uuid-1"
       200:
         description: Developer already exists
-        schema:
-          properties:
-            message:
-              type: string
-              example: "Developer already exists"
-            developerId:
-              type: string
-              example: "dev-uuid-1"
       400:
         description: Invalid input or email format
-        schema:
-          properties:
-            error:
-              type: string
-              example: "Invalid email format"
-      500:
-        description: Internal server error
-        schema:
-          properties:
-            error:
-              type: string
-              example: "Failed to create developer"
     """
+ 
     data = request.json
     required_fields = ['name', 'email']
     if not all(field in data for field in required_fields):
@@ -445,26 +344,20 @@ def create_developer():
 @ad_routes_blueprint.route('/ads', methods=['POST'])
 def create_ad():
     """
-    Create a new ad (using performer email instead of ID)
+    Create a new ad
     ---
+    tags:
+      - Ads
     parameters:
       - name: ad
         in: body
         required: true
-        description: The ad to create
         schema:
-          id: Ad
-          required:
-            - adName
-            - adDetails
-            - performerEmail
           properties:
             adName:
               type: string
-              description: The name of the ad
             performerEmail:
               type: string
-              description: Email of the performer who owns the ad
             adDetails:
               type: object
               properties:
@@ -477,33 +370,17 @@ def create_ad():
                   enum: [low, medium, high]
                 skipTime:
                   type: number
-                  format: float
                 exitTime:
                   type: number
-                  format: float
-        examples:
-          application/json:
-            {
-              "adName": "My Ad Campaign",
-              "performerEmail": "performer@example.com",
-              "adDetails": {
-                "videoUrl": "https://example.com/video.mp4",
-                "targetUrl": "https://example.com/landing",
-                "budget": "low",
-                "skipTime": 5.0,
-                "exitTime": 30.0
-              }
-            }
     responses:
       201:
         description: Ad created successfully
       400:
-        description: Invalid request
+        description: Invalid request data
       404:
         description: Performer not found
-      500:
-        description: Internal server error
     """
+ 
     ad_data = request.json
 
     required_fields = ['adName', 'performerEmail', 'adDetails']
@@ -570,12 +447,15 @@ def get_all_ads():
     """
     Get all ads
     ---
+    tags:
+      - Ads
     responses:
       200:
-        description: A list of all ads was returned successfully
+        description: List of all ads
       500:
-        description: An error occurred while retrieving ads
+        description: Server error while retrieving ads
     """
+ 
     try:
         ads = list(ads_collection.find())
         for ad in ads:
@@ -588,22 +468,22 @@ def get_all_ads():
 @ad_routes_blueprint.route('/ads/<ad_id>', methods=['GET'])
 def get_ad_by_id(ad_id):
     """
-  Get an ad by ID
-  ---
+    Get an ad by ID
+    ---
+    tags:
+      - Ads
     parameters:
       - name: ad_id
         in: path
         type: string
         required: true
-        description: The ID of the ad to retrieve
     responses:
       200:
-        description: The ad was returned successfully
+        description: Ad details
       404:
         description: Ad not found
-      500:
-        description: An error occurred while retrieving the ad
-        """
+    """
+
     try:
         ad = ads_collection.find_one({'_id': ad_id})
         if ad:
@@ -619,28 +499,27 @@ def update_ad(ad_id):
     """
     Update an existing ad
     ---
+    tags:
+      - Ads
     parameters:
       - name: ad_id
         in: path
         type: string
         required: true
-        description: The ID of the ad to update
       - name: ad
         in: body
         required: true
-        description: The updated ad data
         schema:
-          $ref: '#/definitions/Ad'
+          type: object
     responses:
       200:
-        description: The ad was updated successfully
+        description: Ad updated successfully
       404:
         description: Ad not found
       400:
-        description: The request was invalid
-      500:
-        description: An error occurred while updating the ad
+        description: Invalid update data
     """
+
     update_data = request.json
     if not isinstance(update_data, dict):
         return jsonify({'error': 'Invalid update data'}), 400
@@ -661,20 +540,20 @@ def delete_ad(ad_id):
     """
     Delete an ad
     ---
+    tags:
+      - Ads
     parameters:
       - name: ad_id
         in: path
         type: string
         required: true
-        description: The ID of the ad to delete
     responses:
       200:
-        description: The ad was deleted successfully
+        description: Ad deleted successfully
       404:
         description: Ad not found
-      500:
-        description: An error occurred while deleting the ad
     """
+  
     try:
         # 1. First find the ad to get performer ID
         ad = ads_collection.find_one({'_id': ad_id})
@@ -712,23 +591,22 @@ def get_random_ad():
     """
     Get a random ad for an app
     ---
+    tags:
+      - Ads
     parameters:
       - name: packageName
         in: query
         type: string
         required: true
-        description: Package name of the app
     responses:
       200:
-        description: A random ad was returned successfully
+        description: Random ad returned successfully
       204:
         description: No ads available
       400:
-        description: Missing packageName parameter
-      500:
-        description: An error occurred while retrieving a random ad
+        description: Missing or invalid packageName
     """
-
+ 
     package_name = request.args.get('packageName')
     if not isinstance(package_name, str) or not package_name.strip():
         return jsonify({'error': 'Missing or invalid packageName'}), 400
@@ -753,29 +631,20 @@ def send_ad_event():
     """
     Log an ad event (view, click, skip, exit)
     ---
+    tags:
+      - Events
     parameters:
       - name: event
         in: body
         required: true
-        description: The event data
         schema:
-          id: Event
-          required:
-            - adId
-            - timestamp
-            - eventDetails
           properties:
             adId:
               type: string
             timestamp:
               type: string
-              format: date-time
             eventDetails:
               type: object
-              required:
-                - packageName
-                - eventType
-                - watchDuration
               properties:
                 packageName:
                   type: string
@@ -784,22 +653,16 @@ def send_ad_event():
                   enum: [view, click, skip, exit]
                 watchDuration:
                   type: number
-                  format: float
-    notes:
-      - Each event also updates a daily summary doc in **daily_ad_stats**
-        (write-time counter).
     responses:
       201:
-        description: The event was logged successfully
+        description: Event logged successfully
       400:
-        description: Invalid request
+        description: Invalid event data
       404:
         description: Ad not found
-      500:
-        description: Internal server error
     """
-    data = request.json
 
+    data = request.json
     if 'adId' not in data or 'timestamp' not in data or 'eventDetails' not in data:
         return jsonify({'error': 'Missing adId, timestamp or eventDetails'}), 400
 
@@ -898,40 +761,33 @@ def send_ad_event():
 # Get ad statistics by id
 @ad_routes_blueprint.route('/ads/<ad_id>/stats', methods=['GET'])
 def get_ad_statistics(ad_id):
-    
     """
-    Get aggregated statistics for an ad
-
+    Get statistics for an ad
     ---
+    tags:
+      - Analytics
     parameters:
       - name: ad_id
         in: path
         type: string
         required: true
-        description: ID of the ad whose statistics are requested
       - name: from
         in: query
         type: string
         required: false
-        format: date
-        description: (Optional) Inclusive start date — ISO-8601 YYYY-MM-DD
+        description: Start date (YYYY-MM-DD)
       - name: to
         in: query
         type: string
         required: false
-        format: date
-        description: (Optional) Inclusive end date — ISO-8601 YYYY-MM-DD
+        description: End date (YYYY-MM-DD)
     responses:
       200:
-        description: Statistics calculated from daily roll-ups
+        description: Ad statistics
       404:
         description: Ad not found
-      500:
-        description: Server error
-    tags:
-      - Ads
     """
-
+ 
     ad_doc = ads_collection.find_one({'_id': ad_id})
     if not ad_doc:
         return jsonify({'error': 'Ad not found'}), 404
@@ -961,6 +817,8 @@ def get_performer_statistics(performer_id):
     """
     Get statistics for all ads of a performer
     ---
+    tags:
+      - Analytics
     parameters:
       - name: performer_id
         in: path
@@ -970,21 +828,17 @@ def get_performer_statistics(performer_id):
         in: query
         type: string
         required: false
-        format: date
-        description: (Optional) Inclusive start date — ISO-8601 YYYY-MM-DD
+        description: Start date (YYYY-MM-DD)
       - name: to
         in: query
         type: string
         required: false
-        format: date
-        description: (Optional) Inclusive end date — ISO-8601 YYYY-MM-DD
+        description: End date (YYYY-MM-DD)
     responses:
       200:
-        description: Performer ad statistics returned successfully
+        description: Statistics for all performer's ads
       404:
         description: Performer not found
-      500:
-        description: Server error
     """
     try:
         performer = performers_collection.find_one({'_id': performer_id})
