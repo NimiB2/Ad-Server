@@ -70,3 +70,4 @@ Registers the ad blueprint with the main application.
 ## Related Documentation
 
 For the client-side SDK that consumes this API, see the [Android AdSDK Documentation](https://nimib2.github.io/Android-SDK-Ads/).
+For the management interface and campaign analytics, see the [Ad Portal Documentation](https://nimib2.github.io/ad-platform-portal/).
