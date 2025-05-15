@@ -19,7 +19,7 @@ developers_collection = db['developers']
 try:
     # Index for performer stats queries
     daily_stats_collection.create_index(
-        [("performerId", 1), ("date", 1)],
+        [("performerId", 1), ("adId", 1), ("date", 1)],
         name="performer_date_idx"
     )
     
@@ -732,6 +732,7 @@ def send_ad_event():
         # Update daily performer stats
         stats_key = {
             "performerId": performer_id,
+            "adId": ad_id,
             "date": today_date
         }
         
