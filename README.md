@@ -17,9 +17,11 @@ The Ad SDK system consists of several interconnected components that work togeth
 
 ---
 
-## Demo SDK Video
+## 📱 AdSDK – Watch How It Works
 
-[![AdSDK Platform Demo](https://res.cloudinary.com/dyr4cxjrs/video/upload/c_fill,h_400,w_700,q_auto,f_jpg/v1747338275/AdSdkPlatform_vufnvs.jpg)](https://res.cloudinary.com/dyr4cxjrs/video/upload/v1747338275/AdSdkPlatform_vufnvs.mp4)
+<a href="https://www.kapwing.com/videos/68264cf77eecde027c279537">
+  <img src="https://i.imgur.com/BarqWRo.png" alt="AdSDK Demo" width="200"/>
+</a>
 
 ---
 
