@@ -19,9 +19,14 @@ The Ad SDK system consists of several interconnected components that work togeth
 
 ## 📱 AdSDK – Watch How It Works
 
-<a href="https://www.kapwing.com/videos/68264cf77eecde027c279537">
-  <img src="https://i.imgur.com/BarqWRo.png" alt="AdSDK Demo" width="200"/>
-</a>
+<iframe
+  width="560"
+  height="315"
+  src="https://www.kapwing.com/embed/68264cf77eecde027c279537"
+  frameborder="0"
+  allow="autoplay; encrypted-media"
+  allowfullscreen
+></iframe>
 
 ---
 
