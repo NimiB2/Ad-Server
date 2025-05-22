@@ -18,7 +18,7 @@ The Ad SDK system consists of several interconnected components that work togeth
 
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/NimiB2/Android-SDK-Ads/main/docs/assets/architecture-diagram.jpg"
+<img src="https://raw.githubusercontent.com/NimiB2/video-ad-sdk-android/main/docs/assets/architecture-diagram.jpg"
        alt="Project Architecture Diagram" width="600"/>
 </div>
 
@@ -69,5 +69,5 @@ Registers the ad blueprint with the main application.
 
 ## Related Documentation
 
-For the client-side SDK that consumes this API, see the [Android AdSDK Documentation](https://nimib2.github.io/Android-SDK-Ads/).
-For the management interface and campaign analytics, see the [Ad Portal Documentation](https://nimib2.github.io/ad-platform-portal/).
+For the client-side SDK that consumes this API, see the [Android AdSDK Documentation](https://nimib2.github.io/video-ad-sdk-android/).
+For the management interface and campaign analytics, see the [Ad Portal Documentation](https://nimib2.github.io/video-ad-portal/).
