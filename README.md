@@ -19,7 +19,7 @@ The Ad SDK system consists of several interconnected components that work togeth
 
 ## 📱 AdSDK – Watch How It Works
 
-<a href="https://github.com/NimiB2/video-ad-server/releases/download/v1.0/AdSdkPlatform_V2.mp4">
+<a href="https://NimiB2.github.io/video-ad-server/demo.html">
   <img src="https://i.imgur.com/BarqWRo.png" alt="AdSDK Demo" width="200"/>
 </a>
 
